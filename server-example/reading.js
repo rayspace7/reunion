@@ -98,7 +98,8 @@ app.post('/api/reading', async (req, res) => {
           generationConfig: {
             responseMimeType: 'application/json',
             responseSchema: RESPONSE_SCHEMA,
-            maxOutputTokens: 1800,
+            maxOutputTokens: 4096,
+            thinkingConfig: { thinkingLevel: 'low' }, // 이 작업은 복잡한 추론이 필요 없어서, thinking 토큰 소모를 줄여요.
           },
         }),
       }
@@ -113,10 +114,18 @@ app.post('/api/reading', async (req, res) => {
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
+      console.error('Gemini 응답에 text가 없어요. finishReason:', data.candidates?.[0]?.finishReason, 'usage:', data.usageMetadata);
       return res.status(502).json({ error: 'AI 응답이 비어있어요.' });
     }
 
-    const parsed = JSON.parse(text);
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('JSON 파싱 실패. finishReason:', data.candidates?.[0]?.finishReason, 'usage:', data.usageMetadata);
+      console.error('원문(마지막 300자):', text.slice(-300));
+      return res.status(502).json({ error: '풀이 결과가 잘려서 도착했어요. 다시 시도해주세요.' });
+    }
     res.json(parsed);
   } catch (err) {
     console.error('reading error:', err);

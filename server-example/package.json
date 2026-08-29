@@ -1,15 +1,15 @@
 {
-  "name": "server-example",
+  "name": "reunion-reading-server",
   "type": "module",
   "version": "1.0.0",
-  "description": "",
+  "description": "reunion 앱의 사주 풀이 API 서버 (Gemini 프록시)",
   "main": "reading.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node reading.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "express": "^5.2.1"
   }

@@ -5,7 +5,9 @@ export default defineConfig({
   brand: {
     primaryColor: '#C2694A',
   },
-  permissions: [],
+  permissions: [
+    { name: 'photos', access: 'write' },
+  ],
   navigationBar: {
     withBackButton: true,
     withHomeButton: false,

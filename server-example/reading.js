@@ -73,6 +73,46 @@ app.get('/', (req, res) => {
   res.send('reunion reading server is running');
 });
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Gemini 호출 시 503(과부하)·429(요청 과다) 같은 일시적 에러는 짧게 대기 후 재시도해요.
+ * 400/401/403 같은 요청 자체가 잘못된 에러는 재시도해도 소용없어서 바로 던져요.
+ */
+async function callGeminiWithRetry(userPrompt, maxRetries = 2) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  const body = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: RESPONSE_SCHEMA,
+      maxOutputTokens: 4096,
+      thinkingConfig: { thinkingLevel: 'low' },
+    },
+  });
+
+  let lastResponse;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY },
+      body,
+    });
+
+    if (response.ok) return response;
+
+    lastResponse = response;
+    const retriable = response.status === 503 || response.status === 429;
+    if (!retriable || attempt === maxRetries) return response;
+
+    const waitMs = 800 * (attempt + 1); // 0.8s, 1.6s ...
+    console.warn(`Gemini ${response.status}, ${waitMs}ms 후 재시도 (${attempt + 1}/${maxRetries})`);
+    await sleep(waitMs);
+  }
+  return lastResponse;
+}
+
 app.post('/api/reading', async (req, res) => {
   try {
     const { myName, myGender, myDate, myTime, otherName, otherGender, otherDate, otherTime } = req.body;
@@ -84,26 +124,7 @@ app.post('/api/reading', async (req, res) => {
     const userPrompt = `나: ${myName}${myGender ? '(' + myGender + ')' : ''}, 생년월일 ${myDate}${myTime ? ', 시간 ' + myTime : ' (시간 모름)'}
 그 사람: ${otherName}${otherGender ? '(' + otherGender + ')' : ''}, ${otherDate ? '생년월일 ' + otherDate + (otherTime ? ', 시간 ' + otherTime : ' (시간 모름)') : '생년월일 모름'}`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: RESPONSE_SCHEMA,
-            maxOutputTokens: 4096,
-            thinkingConfig: { thinkingLevel: 'low' }, // 이 작업은 복잡한 추론이 필요 없어서, thinking 토큰 소모를 줄여요.
-          },
-        }),
-      }
-    );
+    const response = await callGeminiWithRetry(userPrompt);
 
     if (!response.ok) {
       const errText = await response.text();

@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 });
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.5-flash'; // 필요하면 ai.google.dev/gemini-api/docs/models 에서 최신 모델명으로 교체하세요.
+const GEMINI_MODEL = 'gemini-3.6-flash'; // 2026년 7월 GA. 최신 모델은 ai.google.dev/gemini-api/docs/models 참고
 
 if (!GEMINI_API_KEY) {
   console.warn('⚠️  GEMINI_API_KEY 환경변수가 설정되지 않았어요. 서버를 시작하기 전에 설정해주세요.');
@@ -68,6 +68,10 @@ const RESPONSE_SCHEMA = {
     'reunion_view', 'timing_text', 'advice', 'score', 'share_line',
   ],
 };
+
+app.get('/', (req, res) => {
+  res.send('reunion reading server is running');
+});
 
 app.post('/api/reading', async (req, res) => {
   try {

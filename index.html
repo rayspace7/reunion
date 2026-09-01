@@ -456,9 +456,8 @@ function maskDateInput(el){
 maskDateInput(document.getElementById('myDate'));
 maskDateInput(document.getElementById('otherDate'));
 
-// ⚠️ 실제 지면의 adGroupId로 바꿔주세요. 앱인토스 콘솔 > 광고 메뉴에서 지면 신청 후 발급받아요.
-// 개발 중에는 테스트용 adGroupId(ait.dev.로 시작)를 사용하세요 — 실제 ID로 테스트하면 정책 위반이에요.
-const AD_GROUP_ID_RESULT_BANNER = "ait.dev.YOUR_TEST_AD_GROUP_ID";
+// 앱인토스 콘솔에서 발급받은 실제 지면 ID예요.
+const AD_GROUP_ID_RESULT_BANNER = "ait.v2.live.1307fed72ae0421d";
 let bannerAttached = false;
 
 if (TossAds.initialize.isSupported()) {

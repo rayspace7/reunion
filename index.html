@@ -440,7 +440,7 @@
 </div>
 
 <script type="module">
-import { File, TossAds } from '@apps-in-toss/web-framework';
+import { File, TossAds, loadFullScreenAd, showFullScreenAd } from '@apps-in-toss/web-framework';
 let currentScreen = 'screen-input';
 let loadingInterval = null;
 
@@ -460,7 +460,13 @@ maskDateInput(document.getElementById('otherDate'));
 const AD_GROUP_ID_RESULT_BANNER = "ait.v2.live.1307fed72ae0421d";
 let bannerAttached = false;
 
-if (TossAds.initialize.isSupported()) {
+// isSupported() 자체가 토스 앱 밖(브릿지 미존재 환경)에서는 에러를 던질 수 있어요.
+// 그래서 항상 이 헬퍼로 감싸서, 실패하면 "미지원"으로 안전하게 처리해요.
+function safeIsSupported(fn){
+  try { return !!fn(); } catch (e) { return false; }
+}
+
+if (safeIsSupported(() => TossAds.initialize.isSupported())) {
   TossAds.initialize({
     callbacks: {
       onInitializationFailed: (e) => console.error('광고 SDK 초기화 실패:', e),
@@ -470,7 +476,7 @@ if (TossAds.initialize.isSupported()) {
 
 function attachResultBanner(){
   if (bannerAttached) return;
-  if (!TossAds.attachBanner.isSupported()) return;
+  if (!safeIsSupported(() => TossAds.attachBanner.isSupported())) return;
   try {
     TossAds.attachBanner(AD_GROUP_ID_RESULT_BANNER, '#ad-banner-result', {
       theme: 'auto',
@@ -484,6 +490,48 @@ function attachResultBanner(){
   } catch (e) {
     console.error('배너 광고 부착 실패:', e);
   }
+}
+
+// 앱인토스 콘솔에서 발급받은 실제 전면 광고 지면 ID예요.
+const AD_GROUP_ID_INTERSTITIAL = "ait.v2.live.90d99678fa094415";
+let readingCount = 0;        // 완료한 풀이 횟수. 2번째 시도(readingCount >= 1)부터 전면 광고를 보여줘요.
+let interstitialLoaded = false;
+
+function preloadInterstitial(){
+  if (!safeIsSupported(() => loadFullScreenAd.isSupported())) return;
+  interstitialLoaded = false;
+  loadFullScreenAd({
+    options: { adGroupId: AD_GROUP_ID_INTERSTITIAL },
+    onEvent: (e) => { if (e.type === 'loaded') interstitialLoaded = true; },
+    onError: (e) => console.error('전면 광고 로드 실패:', e),
+  });
+}
+preloadInterstitial();
+
+/**
+ * 2번째 시도부터, 미리 불러둔 전면 광고를 보여준 뒤 콜백을 실행해요.
+ * 광고가 준비되지 않았거나 미지원 환경이면 광고 없이 바로 진행해요(사용자를 막지 않기 위해).
+ */
+function withInterstitialIfNeeded(proceed){
+  const shouldShowAd = readingCount >= 1 && interstitialLoaded && safeIsSupported(() => showFullScreenAd.isSupported());
+  if (!shouldShowAd) {
+    proceed();
+    return;
+  }
+  showFullScreenAd({
+    options: { adGroupId: AD_GROUP_ID_INTERSTITIAL },
+    onEvent: (e) => {
+      if (e.type === 'dismissed' || e.type === 'failedToShow') {
+        preloadInterstitial(); // 다음 시도를 위해 다시 미리 불러둬요.
+        proceed();
+      }
+    },
+    onError: (e) => {
+      console.error('전면 광고 노출 실패:', e);
+      preloadInterstitial();
+      proceed();
+    },
+  });
 }
 
 // 렌더 무료 티어는 비활성 상태면 잠들어요. 입력화면이 뜨자마자 미리 깨워둬서
@@ -534,6 +582,10 @@ async function startReading(){
 
   window.__reading = {myName, myGender, myDate, myTime, otherName, otherGender, otherDate, otherTime};
 
+  withInterstitialIfNeeded(runReading);
+}
+
+async function runReading(){
   showScreen('screen-loading');
   let i = 0;
   const phraseEl = document.getElementById('loadingPhrase');
@@ -547,6 +599,7 @@ async function startReading(){
     const data = await fetchReading(window.__reading);
     renderResult(window.__reading, data);
     clearInterval(loadingInterval);
+    readingCount++;
     showScreen('screen-result');
     attachResultBanner();
   }catch(e){
@@ -622,7 +675,7 @@ async function downloadCard(){
     const dataUrl = canvas.toDataURL('image/png');
     const base64Only = dataUrl.split(',')[1]; // "data:image/png;base64," 접두어 제거
 
-    if (File.saveBase64.isSupported()) {
+    if (safeIsSupported(() => File.saveBase64.isSupported())) {
       // 토스 앱 안에서는 SDK로 기기 갤러리에 저장해요.
       await File.saveBase64({
         data: base64Only,

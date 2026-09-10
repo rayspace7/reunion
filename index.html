@@ -553,7 +553,7 @@ function showScreen(id){
 }
 
 function resetApp(){
-  showScreen('screen-input');
+  withInterstitialIfNeeded(() => showScreen('screen-input'));
 }
 
 const phrases = [
@@ -608,7 +608,7 @@ async function startReading(){
 
   window.__reading = {myName, myGender, myDate, myTime, otherName, otherGender, otherDate, otherTime};
 
-  withInterstitialIfNeeded(runReading);
+  runReading();
 }
 
 async function runReading(){

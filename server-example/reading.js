@@ -103,7 +103,9 @@ async function callGeminiWithRetry(userPrompt, maxRetries = 3) {
     if (response.ok) return response;
 
     lastResponse = response;
-    const retriable = response.status === 503 || response.status === 429;
+    // 503(일시적 과부하)만 재시도해요. 429(RESOURCE_EXHAUSTED, 무료 티어 한도 초과)는
+    // 재시도해도 다시 막힐 뿐이라 바로 실패 처리해요.
+    const retriable = response.status === 503;
     if (!retriable || attempt === maxRetries) return response;
 
     const waitMs = 800 * (attempt + 1); // 0.8s, 1.6s ...
@@ -129,6 +131,9 @@ app.post('/api/reading', async (req, res) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error('Gemini API error:', response.status, errText);
+      if (response.status === 429) {
+        return res.status(429).json({ error: '지금 이용량이 많아요. 잠시 후 다시 시도해주세요.' });
+      }
       return res.status(502).json({ error: 'AI 풀이 서버 호출에 실패했어요.' });
     }
 

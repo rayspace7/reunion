@@ -631,7 +631,11 @@ async function runReading(){
   }catch(e){
     clearInterval(loadingInterval);
     console.error(e);
-    document.getElementById('formError').textContent = '풀이 중 문제가 생겼어요. 다시 시도해주세요';
+    let msg = e.message || '풀이 중 문제가 생겼어요. 다시 시도해주세요';
+    if (e.name === 'TimeoutError' || e.name === 'AbortError') {
+      msg = '응답이 너무 오래 걸려요. 잠시 후 다시 시도해주세요';
+    }
+    document.getElementById('formError').textContent = msg;
     showScreen('screen-input');
   }
 }
@@ -654,7 +658,14 @@ async function fetchReading({myName, myGender, myDate, myTime, otherName, otherG
     signal: AbortSignal.timeout(60000) // 렌더 무료 티어 콜드스타트(최대 ~50초)를 버틸 수 있게 넉넉히
   });
   if (!response.ok) {
-    throw new Error(`풀이 서버 응답 오류: ${response.status}`);
+    let message = `풀이 서버 응답 오류: ${response.status}`;
+    try {
+      const errBody = await response.json();
+      if (errBody?.error) message = errBody.error;
+    } catch (_) { /* 응답이 JSON이 아니면 기본 메시지 사용 */ }
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
   }
   return await response.json();
 }

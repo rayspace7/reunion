@@ -79,7 +79,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * Gemini 호출 시 503(과부하)·429(요청 과다) 같은 일시적 에러는 짧게 대기 후 재시도해요.
  * 400/401/403 같은 요청 자체가 잘못된 에러는 재시도해도 소용없어서 바로 던져요.
  */
-async function callGeminiWithRetry(userPrompt, maxRetries = 2) {
+async function callGeminiWithRetry(userPrompt, maxRetries = 3) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
